@@ -55,7 +55,7 @@ def query_yes_no(question, default="yes"):
 
     while 1:
         sys.stdout.write(question + prompt)
-        choice = raw_input().lower()
+        choice = input().lower()
         if default is not None and choice == '':
             return default
         elif choice in valid.keys():
@@ -141,7 +141,7 @@ class Encoder(object):
     def _emit_tag_short(self, nr, typ, cls):
         """Emit a short (< 31 bytes) tag."""
         assert nr < 31
-        self._emit(chr(nr | typ | cls))
+        self._emit((nr | typ | cls).to_bytes(1, 'big'))
 
     def _emit_tag_long(self, nr, typ, cls):
         """Emit a long (>= 31 bytes) tag."""
@@ -168,7 +168,7 @@ class Encoder(object):
     def _emit_length_short(self, length):
         """Emit the short length form (< 128 octets)."""
         assert length < 128
-        self._emit(chr(length))
+        self._emit(length.to_bytes(1, 'big'))
 
     def _emit_length_long(self, length):
         """Emit the long length form (>= 128 octets)."""
@@ -185,9 +185,9 @@ class Encoder(object):
         for val in values:
             self._emit(val)
 
-    def _emit(self, s):
+    def _emit(self, s:bytes):
         """Emit raw bytes."""
-        assert isinstance(s, str)
+        assert isinstance(s, bytes)
         self.m_stack[-1].append(s)
 
 
@@ -199,10 +199,10 @@ class Decoder(object):
         self.m_stack = None
         self.m_tag = None
 
-    def start(self, data):
+    def start(self, data:bytes):
         """Start processing `data'."""
-        if not isinstance(data, str):
-            raise Error('Expecting string instance.')
+        if not isinstance(data, bytes):
+            raise Error('Expecting bytes instance.')
         self.m_stack = [[0, data]]
         self.m_tag = None
 
@@ -277,7 +277,6 @@ class Decoder(object):
             if count == 0x7f:
                 raise Error('ASN1 syntax error')
             bytes = self._read_bytes(count)
-            bytes = [ ord(b) for b in bytes ]
             length = 0
             for byte in bytes:
                 length = (length << 8) | byte
@@ -299,7 +298,7 @@ class Decoder(object):
         """Return the next input byte, or raise an error on end-of-input."""
         index, input = self.m_stack[-1]
         try:
-            byte = ord(input[index])
+            byte = input[index]
         except IndexError:
             raise Error('Premature end of input.')
         self.m_stack[-1][0] += 1
@@ -408,7 +407,7 @@ class Certificate:
             if tag[1] == ASN1.TypePrimitive:
                 tag, value = input.read()
                 if tag[0] == ASN1.PrintableString:
-                    value = string.upper(value)
+                    value = value.upper()
                 output.write(value, tag[0], tag[1], tag[2])
                 #trace.write(' ' * indent)
                 #trace.write('[%s] %s (value %s)' %
@@ -671,7 +670,7 @@ class Program:
                 tstore.add_certificate(cert)
             return
         for simulator in simulators():
-            if self.always_yes or query_yes_no("Import certificate to " + simulator.title.encode('utf-8'), "no") == "yes":
+            if self.always_yes or query_yes_no("Import certificate to " + simulator.title, "no") == "yes":
                 print("Importing to " + simulator.truststore_file)
                 tstore = TrustStore(simulator.truststore_file, always_yes=self.always_yes)
                 tstore.add_certificate(cert)
