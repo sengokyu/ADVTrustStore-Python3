@@ -109,7 +109,7 @@ class Encoder(object):
             raise Error('Encoder not initialized. Call start() first.')
         if len(self.m_stack) == 1:
             raise Error('Tag stack is empty.')
-        value = ''.join(self.m_stack[-1])
+        value = b''.join(self.m_stack[-1])
         del self.m_stack[-1]
         self._emit_length(len(value))
         self._emit(value)
@@ -123,12 +123,11 @@ class Encoder(object):
         self._emit(value)
 
     def output(self):
-        """Return the encoded output."""
         if self.m_stack is None:
             raise Error('Encoder not initialized. Call start() first.')
         if len(self.m_stack) != 1:
             raise Error('Stack is not empty.')
-        output = ''.join(self.m_stack[0])
+        output = b''.join(self.m_stack[0])
         return output
 
     def _emit_tag(self, nr, typ, cls):
@@ -145,7 +144,7 @@ class Encoder(object):
 
     def _emit_tag_long(self, nr, typ, cls):
         """Emit a long (>= 31 bytes) tag."""
-        head = chr(typ | cls | 0x1f)
+        head = (typ | cls | 0x1f).to_bytes(1, 'big')
         self._emit(head)
         values = []
         values.append((nr & 0x7f))
@@ -154,9 +153,8 @@ class Encoder(object):
             values.append((nr & 0x7f) | 0x80)
             nr >>= 7
         values.reverse()
-        values = map(chr, values)
         for val in values:
-            self._emit(val)
+            self._emit(val.to_bytes(1, 'big'))
 
     def _emit_length(self, length):
         """Emit length octects."""
@@ -172,18 +170,10 @@ class Encoder(object):
 
     def _emit_length_long(self, length):
         """Emit the long length form (>= 128 octets)."""
-        values = []
-        while length:
-            values.append(length & 0xff)
-            length >>= 8
-        values.reverse()
-        values = map(chr, values)
-        # really for correctness as this should not happen anytime soon
-        assert len(values) < 127
-        head = chr(0x80 | len(values))
+        values = length.to_bytes(4, 'big')
+        head = (0x80 | len(values)).to_bytes(1, 'big')
         self._emit(head)
-        for val in values:
-            self._emit(val)
+        self._emit(values)
 
     def _emit(self, s:bytes):
         """Emit raw bytes."""
@@ -368,7 +358,7 @@ class Certificate:
         sha.update(self._data)
         return sha.digest()
 
-    def get_subject(self):
+    def get_subject(self) -> str:
         """Get the certificate subject in human readable one line format
         """
         if self._data != None:
@@ -376,7 +366,7 @@ class Certificate:
             possl = subprocess.Popen(['openssl',  'x509', '-inform',  'DER',  '-noout',  '-subject', '-nameopt', 'oneline'], 
                 shell=False, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=None)
             subjectText, error_text = possl.communicate(self.get_data())
-            return subjectText
+            return subjectText.decode('utf-8')
         return None
 
     def get_subject_ASN1(self):
@@ -409,13 +399,13 @@ class Certificate:
                 if tag[0] == ASN1.PrintableString:
                     value = value.upper()
                 output.write(value, tag[0], tag[1], tag[2])
-                #trace.write(' ' * indent)
-                #trace.write('[%s] %s (value %s)' %
-                #         (strclass(tag[2]), strid(tag[0]), repr(value)))
-                #trace.write('\n')
+                # trace.write(' ' * indent)
+                # trace.write('[%s] %s (value %s)' %
+                #         (str(tag[2]), str(tag[0]), repr(value)))
+                # trace.write('\n')
             elif tag[1] == ASN1.TypeConstructed:
-                #trace.write(' ' * indent)
-                #trace.write('[%s] %s:\n' % (strclass(tag[2]), strid(tag[0])))
+                # trace.write(' ' * indent)
+                # trace.write('[%s] %s:\n' % (str(tag[2]), str(tag[0])))
                 input.enter()
                 output.enter(tag[0], tag[2])
                 self._process_subject(input, output, indent+2)
@@ -437,11 +427,11 @@ class TrustStore:
             self._title = title
         else:
             self._title = path
-        self._tset = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"\
-            "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"\
-            "<plist version=\"1.0\">\n"\
-            "<array/>\n"\
-            "</plist>\n"
+        self._tset = b"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"\
+            b"<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"\
+            b"<plist version=\"1.0\">\n"\
+            b"<array/>\n"\
+            b"</plist>\n"
         #with open('cert_tset.plist', "rb") as inputFile:
         #    self._tset = inputFile.read()
 
