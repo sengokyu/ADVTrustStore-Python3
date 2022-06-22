@@ -591,18 +591,19 @@ class Simulator:
         self._is_valid = False
         infofile = simulatordir + "/device.plist"
         if os.path.isfile(infofile):
-            info = plistlib.readPlist(infofile)
-            runtime = info["runtime"]
-            if runtime.startswith(self.runtimeName):
-                self.version = runtime[len(self.runtimeName):].replace("-", ".")
-            else:
-                self.version = runtime
-            self.title = info["name"] + " " + self.version
-            for path in self.trustStorePaths:
-                self.truststore_file = simulatordir + path
-                if os.path.isfile(self.truststore_file):
-                    self._is_valid = True
-                    return
+            with open(infofile, 'rb') as fp:
+                info = plistlib.load(fp)
+                runtime = info["runtime"]
+                if runtime.startswith(self.runtimeName):
+                    self.version = runtime[len(self.runtimeName):].replace("-", ".")
+                else:
+                    self.version = runtime
+                self.title = info["name"] + " " + self.version
+                for path in self.trustStorePaths:
+                    self.truststore_file = simulatordir + path
+                    if os.path.isfile(self.truststore_file):
+                        self._is_valid = True
+                        return
 
     def is_valid(self):
         return self._is_valid
